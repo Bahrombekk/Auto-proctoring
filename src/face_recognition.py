@@ -7,7 +7,7 @@ import pickle
 from .face_database import FaceDatabase
 
 class FaceRecognition:
-    def __init__(self, lmdb_dir="/home/bahrombek/Desktop/Avtoproktoring/src/lmdb_data", providers=['CPUExecutionProvider']):
+    def __init__(self, lmdb_dir="/home/bahrombek/Desktop/Auto-proctoring/src/lmdb_data", providers=['CPUExecutionProvider']):
         self.app = FaceAnalysis(providers=providers)
         self.app.prepare(ctx_id=0, det_size=(640, 640))
         self.lmdb_dir = lmdb_dir

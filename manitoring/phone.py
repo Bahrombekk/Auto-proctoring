@@ -3,7 +3,7 @@ import cv2
 from ultralytics import YOLO
 import numpy as np
 
-model = YOLO("/home/bahrombek/Desktop/Avtoproktoring/manitoring/best.pt")
+model = YOLO("/home/bahrombek/Desktop/Auto-proctoring/manitoring/best.pt")
 
 cap = cv2.VideoCapture(0)
 

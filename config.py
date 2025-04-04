@@ -3,7 +3,7 @@ import os
 
 # Umumiy sozlamalar
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LMDB_DIR = os.path.join(BASE_DIR, "/home/bahrombek/Desktop/Avtoproktoring/src/lmdb_data")
+LMDB_DIR = os.path.join(BASE_DIR, "/home/bahrombek/Desktop/Auto-proctoring/src/lmdb_data")
 SAVE_DIR = os.path.join(BASE_DIR, "saved_images")
 VIDEO_DIR = os.path.join(BASE_DIR, "recorded_videos")
 
