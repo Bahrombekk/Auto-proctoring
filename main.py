@@ -41,6 +41,7 @@ def detect_phone(frame):
     return phone_detected, frame
 
 def save_video(frame_buffer, output_path, fps, start_time, end_time):
+    
     if not frame_buffer:
         print("Bufer bo'sh, video saqlanmadi.")
         return

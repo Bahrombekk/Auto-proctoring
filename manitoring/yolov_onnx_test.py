@@ -5,10 +5,10 @@ import numpy as np
 import onnxruntime as ort
 
 # 1. PyTorch modelini yuklash
-pt_model = YOLO("/home/bahrombek/Desktop/Auto-proctoring/tester/yolo11n.pt")  # .pt fayl yo‘li
+pt_model = YOLO("/home/bahrombek/Desktop/Auto-proctoring/manitoring/yolo11n.pt")  # .pt fayl yo‘li
 
 # 2. ONNX modelini yuklash
-onnx_model_path = "/home/bahrombek/Desktop/Auto-proctoring/tester/yolo11n.onnx"  # .onnx fayl yo‘li
+onnx_model_path = "/home/bahrombek/Desktop/Auto-proctoring/manitoring/yolo11n.onnx"  # .onnx fayl yo‘li
 onnx_session = ort.InferenceSession(onnx_model_path)
 onnx_input_name = onnx_session.get_inputs()[0].name
 onnx_output_name = onnx_session.get_outputs()[0].name

@@ -2,7 +2,7 @@
 from ultralytics import YOLO
 import cv2
 
-model = YOLO("/home/bahrombek/Desktop/Auto-proctoring/tester/yolo11n.onnx")
+model = YOLO("/home/bahrombek/Desktop/Auto-proctoring/manitoring/yolov8n.onnx")
 
 cap = cv2.VideoCapture(0)
 

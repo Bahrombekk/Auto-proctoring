@@ -8,8 +8,8 @@ SAVE_DIR = os.path.join(BASE_DIR, "saved_images")
 VIDEO_DIR = os.path.join(BASE_DIR, "recorded_videos")
 
 # YOLO modellari uchun yo'llar
-PERSON_MODEL_PATH = "yolov8n.pt"  # Odam aniqlash uchun YOLOv8 modeli
-PHONE_MODEL_PATH = os.path.join(BASE_DIR, "manitoring", "best.pt")  # Telefon aniqlash uchun maxsus model
+PERSON_MODEL_PATH = "/home/bahrombek/Desktop/Auto-proctoring/manitoring/yolo11n.onnx"  # Odam aniqlash uchun YOLOv8 modeli
+PHONE_MODEL_PATH = os.path.join(BASE_DIR, "manitoring", "/home/bahrombek/Desktop/Auto-proctoring/manitoring/best.onnx")  # Telefon aniqlash uchun maxsus model
 
 # Thresholdlar
 FACE_SIMILARITY_THRESHOLD = 0.4  # Yuz o'xshashligi uchun chegaraviy qiymat

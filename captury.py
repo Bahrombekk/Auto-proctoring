@@ -1,25 +1,18 @@
-# captury.py
 import subprocess
-import time
 
 input_file = "Vakhid-Cs2-Anubis.mp4"
-output_file = 'full_record.avi'
-trimmed_output = 'trimmed_video.avi'
-
-subprocess.run([
-    'ffmpeg', '-i', input_file,
-    '-c:v', 'libxvid', '-c:a', 'mp3',
-    output_file
-])
-
+output_file = "trimmed_video.avi"
 start_trim = 10
 duration = 20
 
 subprocess.run([
-    'ffmpeg', '-i', output_file,
-    '-ss', str(start_trim), '-t', str(duration),
-    '-c:v', 'copy', '-c:a', 'copy',
-    trimmed_output
+    'ffmpeg',
+    '-ss', str(start_trim),
+    '-i', input_file,
+    '-t', str(duration),
+    '-c', 'copy',
+    '-avoid_negative_ts', 'make_zero',
+    output_file
 ])
 
-print("Kesilgan video saqlandi:", trimmed_output)
+print("Eng tez ishlovchi kesma saqlandi:", output_file)
