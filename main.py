@@ -8,7 +8,7 @@ from src.db_management import DBManager
 from config import *
 import time
 from collections import deque
-from manitoring.proctor import run_proctoring  # Proctoring funksiyasini import qilamiz
+from manitoring.proctor import run_proctoring
 
 # Modellarni yuklash
 person_model = YOLO(PERSON_MODEL_PATH)
@@ -21,10 +21,6 @@ def detect_persons(frame):
         for box in result.boxes:
             if int(box.cls[0]) == 0 and box.conf[0] > DETECTION_CONF_THRESHOLD:
                 person_count += 1
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                #cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                #cv2.putText(frame, f"Person {box.conf[0]:.2f}", (x1, y1 - 10),
-                            #cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
     return person_count, frame
 
 def detect_phone(frame):
@@ -34,25 +30,7 @@ def detect_phone(frame):
         for box in result.boxes:
             if box.conf[0] > DETECTION_CONF_THRESHOLD:
                 phone_detected = True
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                #cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                #cv2.putText(frame, f"Phone {box.conf[0]:.2f}", (x1, y1 - 10),
-                            #cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
     return phone_detected, frame
-
-def save_video(frame_buffer, output_path, fps, start_time, end_time):
-    
-    if not frame_buffer:
-        print("Bufer bo'sh, video saqlanmadi.")
-        return
-    
-    height, width = frame_buffer[0].shape[:2]
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-    for frame in frame_buffer:
-        out.write(frame)
-    out.release()
-    print(f"Video saqlandi: {output_path} ({start_time:.1f}s - {end_time:.1f}s, FPS: {fps})")
 
 def real_time_monitoring():
     face_recognizer = FaceRecognition(LMDB_DIR)
@@ -66,18 +44,24 @@ def real_time_monitoring():
         actual_fps = FPS
     print(f"Kameraning FPS: {actual_fps}")
 
-    max_buffer_size = int(actual_fps * VIDEO_DURATION * 2)
-    frame_buffer = deque(maxlen=max_buffer_size)
-    timestamps = deque(maxlen=max_buffer_size)
-
+    # Video yozuvchisi uchun tayyorgarlik (faqat qoidabuzarlik paytida ishlaydi)
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
     recording = False
-    violation_active = False
+    video_writer = None
     violation_start_time = None
-    last_violation_time = None
+    no_violation_duration = VIDEO_DURATION  # Qoidabuzarlik tugagandan keyin qancha kutish
     countdown_start_time = None
-    no_violation_duration = VIDEO_DURATION
 
     frame_count = 0
+    violation_active = False
+    last_person_count = 0
+    last_phone_detected = False
+    last_proctor_violation = False
+    last_proctor_text = ""
+    last_face_detected = False
+    last_face_recognized = False
+    last_status_text = "Nazorat normal"
+    last_status_color = (0, 255, 0)
 
     while True:
         ret, frame = cap.read()
@@ -87,123 +71,113 @@ def real_time_monitoring():
 
         frame_count += 1
         current_time = time.time()
-        frame_buffer.append(frame.copy())
-        timestamps.append(current_time)
 
-        # Yuzni aniqlash
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        embedding, bbox = face_recognizer.get_face_embedding(rgb_frame)
-        face_detected = embedding is not None
-        match_id, similarity = None, -1
-        
-        if face_detected:
-            match_id, similarity = face_recognizer.compare_face_with_all(embedding)
-            face_recognized = match_id is not None and similarity >= FACE_SIMILARITY_THRESHOLD
-        else:
-            face_recognized = False
-
-        # Odam va telefon aniqlash
-        person_count, frame = detect_persons(frame)
-        phone_detected, frame = detect_phone(frame)
-
-        # Proctoring qoida buzarligini tekshirish
-        frame, proctor_violation, proctor_violation_text = run_proctoring(frame)
-
-        # Yuz vizualizatsiyasi
-        if face_detected and bbox is not None:
-            x1, y1, x2, y2 = map(int, bbox)
-            if face_recognized:
-                label = f"ID: {match_id} ({similarity:.2f})"
-                color = (0, 255, 0)
-            else:
-                label = f"Noma'lum ({similarity:.2f})"
-                color = (0, 0, 255)
-            #cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            #cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-        #else:
-            #cv2.putText(frame, "Yuz topilmadi", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-
-        # Qoidabuzarlikni tekshirish (proctor qoida buzarligi qo'shildi)
-        violation = (
-            not face_detected or
-            not face_recognized or
-            person_count > 1 or
-            phone_detected or
-            proctor_violation  # Proctoringdan kelgan qoida buzarlik
-        )
-
-        # Qoida buzilish sabablari
-        violation_reasons = []
-        if not face_detected:
-            violation_reasons.append("Yuz aniqlanmadi")
-        elif not face_recognized:
-            violation_reasons.append("Yuz tanilmadi")
-        if person_count > 1:
-            violation_reasons.append(f"{person_count} odam aniqlandi")
-        if phone_detected:
-            violation_reasons.append("Telefon aniqlandi")
-        if proctor_violation and proctor_violation_text:
-            violation_reasons.append(proctor_violation_text)  # Proctoring sababi
-
-        # Status ko'rsatish
-        status_text = "Nazorat normal" if not violation else "QOIDABUZARLIK: " + ", ".join(violation_reasons)
-        status_color = (0, 255, 0) if not violation else (0, 0, 255)
-        cv2.putText(frame, status_text, (10, frame.shape[0] - 20), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
-
-        #if recording:
-            #cv2.putText(frame, "YOZILMOQDA", (frame.shape[1] - 200, frame.shape[0] - 20), 
-                        #cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        # Har 4-kadrda tekshirish
+        if frame_count % 4 == 0:
+            # Yuzni aniqlash
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            embedding, bbox = face_recognizer.get_face_embedding(rgb_frame)
+            last_face_detected = embedding is not None
+            match_id, similarity = None, -1
             
-        # Qoidabuzarlik boshlanishi
-        if violation:
-            if not violation_active:
-                violation_active = True
-                last_violation_time = current_time
-                if not recording:
-                    recording = True
-                    first_timestamp_idx = max(0, len(timestamps) - int(actual_fps * VIDEO_DURATION))
-                    violation_start_time = timestamps[first_timestamp_idx] if timestamps else current_time
-                    print(f"Qoidabuzarlik boshlandi: {current_time:.1f}s, Yozish boshlandi: {violation_start_time:.1f}s")
-                    print(f"Sabab: {', '.join(violation_reasons)}")
-                else:
-                    print(f"Yangi qoidabuzarlik aniqlandi: {current_time:.1f}s, Yozish davom etmoqda")
-                    print(f"Sabab: {', '.join(violation_reasons)}")
-                countdown_start_time = None
+            if last_face_detected:
+                match_id, similarity = face_recognizer.compare_face_with_all(embedding)
+                last_face_recognized = match_id is not None and similarity >= FACE_SIMILARITY_THRESHOLD
             else:
-                last_violation_time = current_time
-        else:
-            if violation_active:
-                violation_active = False
-                countdown_start_time = current_time
-                print(f"Qoidabuzarlik tugadi: {current_time:.1f}s, {no_violation_duration} sekund kutilmoqda")
+                last_face_recognized = False
 
-        # Yozishni to'xtatish
+            # Odam va telefon aniqlash
+            last_person_count, frame = detect_persons(frame)
+            last_phone_detected, frame = detect_phone(frame)
+
+            # Proctoring qoida buzarligini tekshirish
+            frame, last_proctor_violation, last_proctor_text = run_proctoring(frame)
+
+            # Qoidabuzarlikni tekshirish
+            violation = (
+                not last_face_detected or
+                not last_face_recognized or
+                last_person_count > 1 or
+                last_phone_detected or
+                last_proctor_violation
+            )
+
+            # Qoida buzilish sabablari
+            violation_reasons = []
+            if not last_face_detected:
+                violation_reasons.append("Yuz aniqlanmadi")
+            elif not last_face_recognized:
+                violation_reasons.append("Yuz tanilmadi")
+            if last_person_count > 1:
+                violation_reasons.append(f"{last_person_count} odam aniqlandi")
+            if last_phone_detected:
+                violation_reasons.append("Telefon aniqlandi")
+            if last_proctor_violation and last_proctor_text:
+                violation_reasons.append(last_proctor_text)
+
+            # Status yangilash
+            last_status_text = "Nazorat normal" if not violation else "QOIDABUZARLIK: " + ", ".join(violation_reasons)
+            last_status_color = (0, 255, 0) if not violation else (0, 0, 255)
+
+            # Qoidabuzarlik boshlanishi
+            if violation:
+                if not violation_active:
+                    violation_active = True
+                    if not recording:
+                        # Video yozishni boshlash
+                        timestamp = int(time.time())
+                        output_path = os.path.join(VIDEO_DIR, f"violation_{timestamp}.avi")
+                        height, width = frame.shape[:2]
+                        video_writer = cv2.VideoWriter(output_path, fourcc, actual_fps, (width, height))
+                        recording = True
+                        violation_start_time = current_time
+                        print(f"Qoidabuzarlik boshlandi: {current_time:.1f}s, Yozish boshlandi: {output_path}")
+                        print(f"Sabab: {', '.join(violation_reasons)}")
+                    else:
+                        print(f"Yangi qoidabuzarlik aniqlandi: {current_time:.1f}s, Yozish davom etmoqda")
+                        print(f"Sabab: {', '.join(violation_reasons)}")
+                    countdown_start_time = None
+            else:
+                if violation_active:
+                    violation_active = False
+                    countdown_start_time = current_time
+                    print(f"Qoidabuzarlik tugadi: {current_time:.1f}s, {no_violation_duration} sekund kutilmoqda")
+
+            # Yozishni to'xtatish
+            if recording and not violation_active and countdown_start_time is not None:
+                time_since_violation = current_time - countdown_start_time
+                if time_since_violation >= no_violation_duration:
+                    video_writer.release()
+                    recording = False
+                    print(f"Yozish tugadi: {current_time:.1f}s, video saqlandi: {output_path}")
+                    video_writer = None
+                    violation_start_time = None
+                    countdown_start_time = None
+
+        # Agar yozish faol bo'lsa, kadrni yozish
+        if recording and video_writer is not None:
+            video_writer.write(frame)
+
+        # Har bir kadrda statusni ko'rsatish
+        cv2.putText(frame, last_status_text, (10, frame.shape[0] - 20), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, last_status_color, 2)
+
         if recording and not violation_active and countdown_start_time is not None:
             time_since_violation = current_time - countdown_start_time
             remaining = no_violation_duration - time_since_violation
             if remaining > 0:
                 cv2.putText(frame, f"Yozish tugashiga: {remaining:.1f}s", (frame.shape[1] - 300, 30), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            if time_since_violation >= no_violation_duration:
-                timestamp = int(time.time())
-                output_path = os.path.join(VIDEO_DIR, f"violation_{timestamp}.avi")
-                save_video(list(frame_buffer), output_path, actual_fps, violation_start_time, current_time)
-                recording = False
-                violation_start_time = None
-                countdown_start_time = None
-                print(f"Yozish tugadi: {current_time:.1f}s, video saqlandi")
 
+        # Real vaqtda oqimni ko'rsatish
         cv2.imshow("Real-Time Monitoring", frame)
-
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    if recording:
-        timestamp = int(time.time())
-        output_path = os.path.join(VIDEO_DIR, f"violation_{timestamp}.avi")
-        save_video(list(frame_buffer), output_path, actual_fps, violation_start_time, current_time)
-        print("Dastur to'xtadi, oxirgi video saqlandi.")
+    # Agar dastur to'xtasa va yozish davom etayotgan bo'lsa, videoni yopish
+    if recording and video_writer is not None:
+        video_writer.release()
+        print(f"Dastur to'xtadi, oxirgi video saqlandi: {output_path}")
 
     cap.release()
     cv2.destroyAllWindows()

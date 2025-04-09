@@ -170,12 +170,12 @@ def run_proctoring(frame):
                     #          cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
                     
                     # Yuz nuqtalarini chizish
-                    mp_drawing.draw_landmarks(
-                        image=frame,
-                        landmark_list=face_landmarks,
-                        connections=mp_face_mesh.FACEMESH_CONTOURS,
-                        landmark_drawing_spec=None,
-                        connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style())
+                    #mp_drawing.draw_landmarks(
+                    #    image=frame,
+                    #    landmark_list=face_landmarks,
+                    #    connections=mp_face_mesh.FACEMESH_CONTOURS,
+                    #    landmark_drawing_spec=None,
+                    #    connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style())
         else:
             #cv2.putText(frame, "Yuz topilmadi", (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             # Yuz yo'qolganligini alohida tekshirish
