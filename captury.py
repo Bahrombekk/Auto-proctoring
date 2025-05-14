@@ -15,4 +15,4 @@ subprocess.run([
     output_file
 ])
 
-print("Eng tez ishlovchi kesma saqlandi:", output_file)
+print("Trimmed video saved:", output_file)

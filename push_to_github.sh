@@ -1,5 +1,5 @@
 #!/bin/bash
-
+git fetch --all
 cd ~/Desktop/Auto-proctoring || {
     echo "Papkaga o'tib bo'lmadi. Yo'lni tekshiring."
     exit 1

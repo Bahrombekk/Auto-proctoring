@@ -1,17 +1,41 @@
-# src/db_management.py
 import lmdb
 import os
 import shutil
 import pickle
+from config import LMDB_DIR
+from src.face_database import FaceDatabase
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class DBManager:
-    def __init__(self, lmdb_dir="lmdb_data"):
+    def __init__(self, lmdb_dir=LMDB_DIR):
         self.lmdb_dir = lmdb_dir
+        self.face_db = FaceDatabase(lmdb_dir)  # FaceDatabase ni ishlatish uchun
     
+    def add_user(self, user_id, image_path):
+        """Foydalanuvchi ID va rasm yo'lini qabul qilib, yuz embeddingini LMDB ga saqlaydi."""
+        try:
+            if not os.path.exists(image_path):
+                logging.error(f"Rasm fayli topilmadi: {image_path}")
+                return False
+            
+            # FaceDatabase yordamida yuz embeddingini saqlash
+            success = self.face_db.save_to_lmdb(image_path, user_id)
+            if success:
+                logging.info(f"Foydalanuvchi ID: {user_id} muvaffaqiyatli qo'shildi.")
+                return True
+            else:
+                logging.error(f"Foydalanuvchi qo'shishda xato: ID {user_id}")
+                return False
+        except Exception as e:
+            logging.error(f"Foydalanuvchi qo'shishda xato: {e}")
+            return False
+
     def list_users(self):
         try:
             if not os.path.exists(self.lmdb_dir):
-                print(f"{self.lmdb_dir} mavjud emas!")
+                logging.error(f"{self.lmdb_dir} does not exist!")
                 return []
             env = lmdb.open(self.lmdb_dir, readonly=True)
             users = []
@@ -22,54 +46,54 @@ class DBManager:
                     users.append(user_id)
             env.close()
             if not users:
-                print("Baza bo'sh!")
+                logging.info("Database is empty!")
             else:
-                print("Bazadagi foydalanuvchilar:")
+                logging.info("Users in database:")
                 for user in users:
-                    print(f"- {user}")
+                    logging.info(f"- {user}")
             return users
         except Exception as e:
-            print(f"Xato yuz berdi: {e}")
+            logging.error(f"Error occurred: {e}")
             return []
 
     def backup_lmdb(self, backup_dir="lmdb_backup"):
         try:
             if not os.path.exists(self.lmdb_dir):
-                print(f"{self.lmdb_dir} mavjud emas!")
+                logging.error(f"{self.lmdb_dir} does not exist!")
                 return False
             if os.path.exists(backup_dir):
                 shutil.rmtree(backup_dir)
             shutil.copytree(self.lmdb_dir, backup_dir)
-            print(f"Baza {backup_dir} ga zaxiralandi.")
+            logging.info(f"Database backed up to {backup_dir}.")
             return True
         except Exception as e:
-            print(f"Zaxiralashda xato: {e}")
+            logging.error(f"Backup error: {e}")
             return False
 
     def delete_user(self, user_id):
         try:
             if not os.path.exists(self.lmdb_dir):
-                print(f"{self.lmdb_dir} mavjud emas!")
+                logging.error(f"{self.lmdb_dir} does not exist!")
                 return False
             env = lmdb.open(self.lmdb_dir, map_size=10485760)
             with env.begin(write=True) as txn:
                 key = str(user_id).encode('utf-8')
                 if txn.get(key) is None:
-                    print(f"ID: {user_id} bazada topilmadi!")
+                    logging.error(f"ID: {user_id} not found in database!")
                     env.close()
                     return False
                 txn.delete(key)
-                print(f"ID: {user_id} bazadan o'chirildi.")
+                logging.info(f"ID: {user_id} deleted from database.")
             env.close()
             return True
         except Exception as e:
-            print(f"O'chirishda xato: {e}")
+            logging.error(f"Deletion error: {e}")
             return False
 
     def delete_all_users(self):
         try:
             if not os.path.exists(self.lmdb_dir):
-                print(f"{self.lmdb_dir} mavjud emas!")
+                logging.error(f"{self.lmdb_dir} does not exist!")
                 return False
             env = lmdb.open(self.lmdb_dir, map_size=10485760)
             with env.begin(write=True) as txn:
@@ -79,35 +103,35 @@ class DBManager:
                     txn.delete(key)
                     count += 1
                 if count == 0:
-                    print("Baza allaqachon bo'sh!")
+                    logging.info("Database is already empty!")
                 else:
-                    print(f"Barcha {count} ta foydalanuvchi o'chirildi.")
+                    logging.info(f"All {count} users deleted.")
             env.close()
             return True
         except Exception as e:
-            print(f"Barchasini o'chirishda xato: {e}")
+            logging.error(f"Error deleting all users: {e}")
             return False
 
     def search_user(self, user_id):
         try:
             if not os.path.exists(self.lmdb_dir):
-                print(f"{self.lmdb_dir} mavjud emas!")
+                logging.error(f"{self.lmdb_dir} does not exist!")
                 return None
             env = lmdb.open(self.lmdb_dir, readonly=True)
             with env.begin() as txn:
                 key = str(user_id).encode('utf-8')
                 value = txn.get(key)
                 if value is None:
-                    print(f"ID: {user_id} topilmadi!")
+                    logging.error(f"ID: {user_id} not found!")
                     env.close()
                     return None
                 embedding = pickle.loads(value)
-                print(f"ID: {user_id} topildi. Embedding uzunligi: {len(embedding)}")
-                print(f"Embedding namunasi: {embedding[:5]}")
+                logging.info(f"ID: {user_id} found. Embedding length: {len(embedding)}")
+                logging.info(f"Embedding sample: {embedding[:5]}")
                 env.close()
                 return embedding
         except Exception as e:
-            print(f"Qidirishda xato: {e}")
+            logging.error(f"Search error: {e}")
             return None
 
     def run_menu(self):
@@ -118,34 +142,39 @@ class DBManager:
             elif choice == "2":
                 self.backup_lmdb("lmdb_backup")
             elif choice == "3":
-                user_id = input("O'chiriladigan foydalanuvchi ID sini kiriting: ")
+                user_id = input("Enter user ID to delete: ")
                 self.delete_user(user_id)
             elif choice == "4":
-                confirm = input("Barcha foydalanuvchilarni o'chirishni tasdiqlaysizmi? (ha/yo'q): ")
-                if confirm.lower() == "ha":
+                confirm = input("Confirm deletion of all users? (yes/no): ")
+                if confirm.lower() == "yes":
                     self.delete_all_users()
                 else:
-                    print("O'chirish bekor qilindi.")
+                    logging.info("Deletion cancelled.")
             elif choice == "5":
-                user_id = input("Qidiriladigan foydalanuvchi ID sini kiriting: ")
+                user_id = input("Enter user ID to search: ")
                 self.search_user(user_id)
+            elif choice == "6":
+                user_id = input("Enter user ID to add: ")
+                image_path = input("Enter path to user image: ")
+                self.add_user(user_id, image_path)
             elif choice == "0":
-                print("Dastur yakunlandi.")
+                logging.info("Program terminated.")
                 break
             else:
-                print("Noto'g'ri tanlov! Iltimos, 0-5 oralig'ida raqam kiriting.")
-    
+                logging.warning("Invalid choice! Please enter 0-6.")
+
     def show_menu(self):
-        print("\n=== LMDB Baza Boshqaruvi ===")
-        print("1. Bazadagi foydalanuvchilar ro'yxatini ko'rish")
-        print("2. Bazani zaxiralash")
-        print("3. Foydalanuvchini o'chirish")
-        print("4. Barcha foydalanuvchilarni o'chirish")
-        print("5. Foydalanuvchini qidirish")
-        print("0. Chiqish")
-        choice = input("Tanlovni kiriting (0-5): ")
+        print("\n=== LMDB Database Management ===")
+        print("1. List all users")
+        print("2. Backup database")
+        print("3. Delete a user")
+        print("4. Delete all users")
+        print("5. Search for a user")
+        print("6. Add a user")
+        print("0. Exit")
+        choice = input("Enter choice (0-6): ")
         return choice
 
 if __name__ == "__main__":
-    db_manager = DBManager("lmdb_data")
+    db_manager = DBManager()
     db_manager.run_menu()

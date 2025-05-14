@@ -1,29 +1,37 @@
-# config.py
 import os
 
-# Umumiy sozlamalar
+# Base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LMDB_DIR = os.path.join(BASE_DIR, "/home/bahrombek/Desktop/Auto-proctoring/src/lmdb_data")
+
+# Directory paths
+LMDB_DIR = os.path.join(BASE_DIR, "lmdb_data")
 SAVE_DIR = os.path.join(BASE_DIR, "saved_images")
 VIDEO_DIR = os.path.join(BASE_DIR, "recorded_videos")
+MODEL_DIR = os.path.join(BASE_DIR, "models")
 
-# YOLO modellari uchun yo'llar
-PERSON_MODEL_PATH = "/home/bahrombek/Desktop/Auto-proctoring/manitoring/yolo11n.onnx"  # Odam aniqlash uchun YOLOv8 modeli
-PHONE_MODEL_PATH = os.path.join(BASE_DIR, "manitoring", "/home/bahrombek/Desktop/Auto-proctoring/manitoring/best.onnx")  # Telefon aniqlash uchun maxsus model
+# YOLO model paths
+PERSON_MODEL_PATH = os.path.join(MODEL_DIR, "yolov8n.onnx")  # Person detection model
+PHONE_MODEL_PATH = os.path.join(MODEL_DIR, "best.pt")        # Phone detection model
 
-# Thresholdlar
-FACE_SIMILARITY_THRESHOLD = 0.4  # Yuz o'xshashligi uchun chegaraviy qiymat
-DETECTION_CONF_THRESHOLD = 0.5  # Ob'ekt aniqlash uchun ishonchlilik chegarasi
+# Feature toggle switches
+ENABLE_PERSON_DETECTION = False   # Enable/disable person detection
+ENABLE_PHONE_DETECTION = False    # Enable/disable phone detection
+ENABLE_FACE_RECOGNITION = False   # Enable/disable face recognition
+ENABLE_PROCTORING = True         # Enable/disable proctoring rules
 
-# Video yozish sozlamalari
-VIDEO_DURATION = 10  # Sekundlarda oldingi va keyingi video uzunligi
-FPS = 30  # Kadrlar soni sekundda
-FRAME_BUFFER_SIZE = FPS * VIDEO_DURATION * 2  # 20 sekundlik bufer (10s oldin + 10s keyin)
+# Thresholds
+FACE_SIMILARITY_THRESHOLD = 0.4  # Face similarity threshold
+DETECTION_CONF_THRESHOLD = 0.5   # Object detection confidence threshold
 
-# Kamera sozlamalari
-CAMERA_INDEX = 0  # Standart kamera indeksi
+# Video recording settings
+VIDEO_DURATION = 10  # Seconds for before and after violation video
+FPS = 30             # Frames per second
+FRAME_BUFFER_SIZE = FPS * VIDEO_DURATION * 2  # 20-second buffer (10s before + 10s after)
 
-# Direktoriyalarni yaratish
-for directory in [LMDB_DIR, SAVE_DIR, VIDEO_DIR]:
+# Camera settings
+CAMERA_INDEX = 0  # Default camera index
+
+# Create directories if they don't exist
+for directory in [LMDB_DIR, SAVE_DIR, VIDEO_DIR, MODEL_DIR]:
     if not os.path.exists(directory):
         os.makedirs(directory)
