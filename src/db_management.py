@@ -1,17 +1,27 @@
+# src/db_management.py
 import lmdb
 import os
 import shutil
 import pickle
-from config import LMDB_DIR
+from config import LMDB_DIR, LMDB_DIR_DLIB, LMDB_DIR_INSIGHTFACE
 from src.face_database import FaceDatabase
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class DBManager:
-    def __init__(self, lmdb_dir=LMDB_DIR):
+    def __init__(self, lmdb_dir=LMDB_DIR, model_type=None):
         self.lmdb_dir = lmdb_dir
-        self.face_db = FaceDatabase(lmdb_dir)  # FaceDatabase ni ishlatish uchun
+        self.model_type = model_type
+        self.face_db = FaceDatabase(lmdb_dir, model_type)  # Pass model_type to FaceDatabase
+        
+        # Create directory if it doesn't exist
+        if not os.path.exists(self.lmdb_dir):
+            try:
+                os.makedirs(self.lmdb_dir)
+                logging.info(f"Created directory: {self.lmdb_dir}")
+            except Exception as e:
+                logging.error(f"Failed to create directory {self.lmdb_dir}: {str(e)}")
     
     def add_user(self, user_id, image_path):
         """Foydalanuvchi ID va rasm yo'lini qabul qilib, yuz embeddingini LMDB ga saqlaydi."""
@@ -135,12 +145,15 @@ class DBManager:
             return None
 
     def run_menu(self):
+        db_type = "Dlib" if self.model_type == "dlib" else "InsightFace" if self.model_type == "insightface" else "Default"
+        
         while True:
-            choice = self.show_menu()
+            choice = self.show_menu(db_type)
             if choice == "1":
                 self.list_users()
             elif choice == "2":
-                self.backup_lmdb("lmdb_backup")
+                backup_dir = f"lmdb_backup_{self.model_type}" if self.model_type else "lmdb_backup"
+                self.backup_lmdb(backup_dir)
             elif choice == "3":
                 user_id = input("Enter user ID to delete: ")
                 self.delete_user(user_id)
@@ -158,20 +171,20 @@ class DBManager:
                 image_path = input("Enter path to user image: ")
                 self.add_user(user_id, image_path)
             elif choice == "0":
-                logging.info("Program terminated.")
+                logging.info("Returning to main menu.")
                 break
             else:
                 logging.warning("Invalid choice! Please enter 0-6.")
 
-    def show_menu(self):
-        print("\n=== LMDB Database Management ===")
+    def show_menu(self, db_type="Default"):
+        print(f"\n=== {db_type} LMDB Database Management ===")
         print("1. List all users")
         print("2. Backup database")
         print("3. Delete a user")
         print("4. Delete all users")
         print("5. Search for a user")
         print("6. Add a user")
-        print("0. Exit")
+        print("0. Return to main menu")
         choice = input("Enter choice (0-6): ")
         return choice
 

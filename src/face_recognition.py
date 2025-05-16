@@ -1,56 +1,79 @@
+# src/face_recognition.py
+import logging
 import cv2
 import numpy as np
-from insightface.app import FaceAnalysis
 import lmdb
 import pickle
-from .face_database import FaceDatabase
-from config import LMDB_DIR, FACE_SIMILARITY_THRESHOLD, ENABLE_FACE_RECOGNITION
-import logging
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+from src.face_database import FaceDatabase
 
 class FaceRecognition:
-    def __init__(self, lmdb_dir=LMDB_DIR, providers=['CPUExecutionProvider']):
-        self.app = FaceAnalysis(providers=providers)
-        self.app.prepare(ctx_id=0, det_size=(640, 640))
+    def __init__(self, lmdb_dir, model_type=None):
+        """
+        Initialize face recognition system
+        
+        Args:
+            lmdb_dir: Directory for LMDB database
+            model_type: 'insightface' or 'dlib'
+        """
+        self.model_type = model_type or "insightface"  # Default to InsightFace if not specified
         self.lmdb_dir = lmdb_dir
-        self.face_db = FaceDatabase(lmdb_dir, providers) if ENABLE_FACE_RECOGNITION else None
+        
+        # Initialize face database with appropriate model
+        try:
+            self.face_db = FaceDatabase(lmdb_dir, model_type)
+            logging.info(f"Face recognition initialized with {model_type} model")
+        except Exception as e:
+            logging.error(f"Failed to initialize face database: {str(e)}")
+            self.face_db = None
     
-    def get_face_embedding(self, image):
-        if not ENABLE_FACE_RECOGNITION:
-            logging.debug("Face recognition is disabled.")
+    def get_face_embedding(self, image, model_type=None):
+        """
+        Extract face embedding from an image
+        
+        Args:
+            image: RGB image as numpy array
+            model_type: Optional override for model type
+            
+        Returns:
+            embedding: Face embedding vector
+            bbox: Bounding box coordinates [x1, y1, x2, y2]
+        """
+        # Use instance model_type if not specified
+        model_type = model_type or self.model_type
+        
+        if self.face_db is None:
+            logging.error("Face database not initialized")
             return None, None
-        faces = self.app.get(image)
-        if len(faces) == 0:
+            
+        try:
+            # Use face database to get embedding
+            embedding, bbox = self.face_db.get_face_embedding(image)
+            return embedding, bbox
+        except Exception as e:
+            logging.error(f"Error getting face embedding: {str(e)}")
             return None, None
-        embedding = faces[0].normed_embedding
-        return embedding, faces[0].bbox
     
-    def compare_face_with_target(self, embedding, target_id, threshold=FACE_SIMILARITY_THRESHOLD):
-        if not ENABLE_FACE_RECOGNITION or embedding is None or self.face_db is None:
+    def compare_face_with_all(self, test_embedding, model_type=None):
+        """
+        Compare test embedding with all faces in the database
+        
+        Args:
+            test_embedding: Face embedding vector to test
+            model_type: Optional override for model type
+            
+        Returns:
+            tuple: (best_match_id, similarity_score or distance)
+        """
+        # Use instance model_type if not specified
+        model_type = model_type or self.model_type
+        
+        if self.face_db is None:
+            logging.error("Face database not initialized")
             return None, -1
-        db_embedding = self.face_db.read_from_lmdb(target_id)
-        if db_embedding is None:
+            
+        try:
+            # Use face database to compare with all stored faces
+            return self.face_db.compare_face_with_all(test_embedding)
+        except Exception as e:
+            logging.error(f"Error comparing face with database: {str(e)}")
             return None, -1
-        similarity = np.dot(embedding, db_embedding) / (np.linalg.norm(embedding) * np.linalg.norm(db_embedding))
-        if similarity > threshold:
-            return target_id, similarity
-        return None, similarity
-    
-    def compare_face_with_all(self, embedding, threshold=FACE_SIMILARITY_THRESHOLD):
-        if not ENABLE_FACE_RECOGNITION or embedding is None or self.face_db is None:
-            return None, -1
-        db_embeddings = self.face_db.load_all_embeddings()
-        if not db_embeddings:
-            return None, -1
-        best_match_id = None
-        best_similarity = -1
-        for user_id, db_embedding in db_embeddings.items():
-            similarity = np.dot(embedding, db_embedding) / (np.linalg.norm(embedding) * np.linalg.norm(db_embedding))
-            if similarity > threshold and similarity > best_similarity:
-                best_match_id = user_id
-                best_similarity = similarity
-        return best_match_id, best_similarity
-
-if __name__ == "__main__":
-    face_recognizer = FaceRecognition()

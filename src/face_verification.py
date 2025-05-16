@@ -1,9 +1,10 @@
+# src/face_verification.py
 import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
 from config import FACE_SIMILARITY_THRESHOLD
 import logging
-
+import os
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class FaceVerification:
